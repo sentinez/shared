@@ -12,14 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tls
-
-import (
-	"crypto/tls"
-
-	"github.com/exaring/ja4plus"
-)
-
-func JA4(hello *tls.ClientHelloInfo) string {
-	return ja4plus.JA4(hello)
-}
+package config
