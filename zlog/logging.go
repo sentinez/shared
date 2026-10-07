@@ -23,12 +23,12 @@ import (
 )
 
 const (
-	loggerEvent = "event"
-	loggerKind  = "kind"
+	loggingEvent = "event"
+	loggingKind  = "kind"
 )
 
 var (
-	_ Log       = (*logger)(nil)
+	_ Log       = (*logging)(nil)
 	_ LogCloser = (*logCloser)(nil)
 )
 
@@ -50,118 +50,100 @@ type LogCloser interface {
 	Sync() error
 }
 
-func NewLog(named string, logKind typepb.LogKind, level Level,
+func NewLog(named string, logKind typepb.LogType, level Level,
 	opts ...Option) Log {
 
-	logger := configJSONLogger(named, newLoggerOptions(opts))
-	return createLogger(logger, logKind, ToLevel(level.String()).Int())
+	logging := configJSONLogging(named, newLoggingOptions(opts))
+	return createLogging(logging, logKind, ToLevel(level.String()).Int())
 }
 
 // NewLogCloser creates a LogCloser; pass WithOTLPProvider to export its
 // records through a dedicated OTLP setup.
-func NewLogCloser(named string, logKind typepb.LogKind, level Level,
+func NewLogCloser(named string, logKind typepb.LogType, level Level,
 	opts ...Option) LogCloser {
 
-	logger := configJSONLogger(named, newLoggerOptions(opts))
+	logging := configJSONLogging(named, newLoggingOptions(opts))
 	return &logCloser{
-		logger: createLogger(logger, logKind, ToLevel(level.String()).Int()),
+		logging: createLogging(logging, logKind, ToLevel(level.String()).Int()),
 	}
 
 }
 
-func createLogger(log *zap.Logger,
-	kind typepb.LogKind, verbosity int) *logger {
-	return &logger{log: log, verbosity: verbosity, kind: kind}
+func createLogging(log *zap.Logger,
+	kind typepb.LogType, verbosity int) *logging {
+	return &logging{log: log, verbosity: verbosity, kind: kind}
 }
 
-type logger struct {
+type logging struct {
 	log       *zap.Logger
-	kind      typepb.LogKind
+	kind      typepb.LogType
 	verbosity int
 }
 
-// Debug implements Logger.
-func (l *logger) Debug(msg string, event proto.Message) {
+func (l *logging) Debug(msg string, event proto.Message) {
 	if l.V(LevelDebug.Int()) {
 		l.log.Debug(msg,
-			zap.Object(loggerEvent, marshaler(event)))
+			zap.Object(loggingEvent, marshaler(event)))
 	}
 }
 
-// Error implements Logger.
-func (l *logger) Error(msg string, event proto.Message) {
+func (l *logging) Error(msg string, event proto.Message) {
 	if l.V(LevelError.Int()) {
 		l.log.Error(msg,
-			zap.Object(loggerEvent, marshaler(event)))
+			zap.Object(loggingEvent, marshaler(event)))
 	}
 }
 
-// Info implements Logger.
-func (l *logger) Info(msg string, event proto.Message) {
+func (l *logging) Info(msg string, event proto.Message) {
 	if l.V(LevelInfo.Int()) {
-		l.log.Info(msg, zap.String(loggerKind, l.kind.String()),
-			zap.Object(loggerEvent, marshaler(event)))
+		l.log.Info(msg, zap.String(loggingKind, l.kind.String()),
+			zap.Object(loggingEvent, marshaler(event)))
 	}
 }
 
-// Sync implements Logger.
-func (l *logger) Sync() error {
+func (l *logging) Sync() error {
 	return l.log.Sync()
 }
 
-// V implements Logger.
-func (l *logger) V(ll int) bool {
+func (l *logging) V(ll int) bool {
 	return ll >= l.verbosity
 }
 
-// Warn implements Logger.
-func (l *logger) Warn(msg string, event proto.Message) {
+func (l *logging) Warn(msg string, event proto.Message) {
 	if l.V(LevelWarning.Int()) {
 		l.log.Warn(msg,
-			zap.Object(loggerEvent, marshaler(event)))
+			zap.Object(loggingEvent, marshaler(event)))
 	}
 }
 
 type logCloser struct {
-	*logger
+	*logging
 }
 
-// Debug implements [LogCloser].
-// Subtle: this method shadows the method (*logger).Debug of logCloser.logger.
 func (l *logCloser) Debug(msg string, event proto.Message, closer io.Closer) {
-	l.logger.Debug(msg, event)
+	l.logging.Debug(msg, event)
 	_ = closer.Close()
 }
 
-// Error implements [LogCloser].
-// Subtle: this method shadows the method (*logger).Error of logCloser.logger.
 func (l *logCloser) Error(msg string, event proto.Message, closer io.Closer) {
-	l.logger.Error(msg, event)
+	l.logging.Error(msg, event)
 	_ = closer.Close()
 }
 
-// Info implements [LogCloser].
-// Subtle: this method shadows the method (*logger).Info of logCloser.logger.
 func (l *logCloser) Info(msg string, event proto.Message, closer io.Closer) {
-	l.logger.Info(msg, event)
+	l.logging.Info(msg, event)
 	_ = closer.Close()
 }
 
-// Sync implements [LogCloser].
-// Subtle: this method shadows the method (*logger).Sync of logCloser.logger.
 func (l *logCloser) Sync() error {
-	return l.logger.Sync()
+	return l.logging.Sync()
 }
 
-// V implements [LogCloser].
-// Subtle: this method shadows the method (*logger).V of logCloser.logger.
 func (l *logCloser) V(level int) bool {
-	return l.logger.V(level)
+	return l.logging.V(level)
 }
 
-// Warn implements [LogCloser].
-// Subtle: this method shadows the method (*logger).Warn of logCloser.logger.
 func (l *logCloser) Warn(msg string, event proto.Message, closer io.Closer) {
-	l.logger.Warn(msg, event)
+	l.logging.Warn(msg, event)
 	_ = closer.Close()
 }
